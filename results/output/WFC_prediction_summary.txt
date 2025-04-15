@@ -1,0 +1,5 @@
+Average Accuracy: 98.73690684155787
+Best Stock: WFC
+Worst Stock: WFC
+Average RMSE: 0.6765402317083281
+Average MAE: 0.5070451977567636

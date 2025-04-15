@@ -1,0 +1,5 @@
+Average Accuracy: 99.29580074903929
+Best Stock: JNJ
+Worst Stock: JNJ
+Average RMSE: 1.5666320443580244
+Average MAE: 1.0657922090193506
