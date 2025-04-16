@@ -21,7 +21,7 @@ from yahoo_fin.news import get_yf_rss
 
 # 设置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('StockNewsProcessor')

@@ -22,6 +22,70 @@ import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from concurrent.futures import ThreadPoolExecutor
 import glob # Import glob for file searching
+import matplotlib
+import platform
+import matplotlib.font_manager as fm
+
+# 设置matplotlib的中文字体
+def setup_chinese_fonts():
+    """配置matplotlib中文字体"""
+    system = platform.system()
+    
+    # 中文字体候选列表
+    if system == 'Windows':
+        font_list = [
+            'Microsoft YaHei',
+            'SimHei',
+            'SimSun',
+            'NSimSun',
+            'FangSong',
+            'KaiTi'
+        ]
+    elif system == 'Darwin':  # macOS
+        font_list = [
+            'Arial Unicode MS',
+            'Heiti TC',
+            'Hiragino Sans GB',
+            'STHeiti',
+            'Apple LiGothic Medium'
+        ]
+    else:  # Linux
+        font_list = [
+            'DejaVu Sans',
+            'WenQuanYi Micro Hei',
+            'WenQuanYi Zen Hei',
+            'Noto Sans CJK SC',
+            'Noto Sans CJK TC',
+            'Source Han Sans CN',
+            'Source Han Sans TW'
+        ]
+
+    # 尝试设置字体
+    font_found = False
+    for font_name in font_list:
+        try:
+            matplotlib.font_manager.findfont(font_name)
+            plt.rcParams['font.family'] = ['sans-serif']
+            plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+            logger.info(f"成功设置字体: {font_name}")
+            font_found = True
+            break
+        except Exception as e:
+            continue
+
+    if not font_found:
+        logger.warning("未能找到合适的中文字体，将使用系统默认字体")
+        
+    # 其他必要的字体设置
+    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    plt.rcParams['figure.dpi'] = 100  # 设置DPI
+    plt.rcParams['savefig.dpi'] = 300  # 设置保存图片的DPI
+    plt.rcParams['font.size'] = 12  # 设置默认字体大小
+    plt.rcParams['axes.titlesize'] = 14  # 设置标题字体大小
+    plt.rcParams['axes.labelsize'] = 12  # 设置轴标签字体大小
+    plt.rcParams['xtick.labelsize'] = 10  # 设置x轴刻度标签字体大小
+    plt.rcParams['ytick.labelsize'] = 10  # 设置y轴刻度标签字体大小
+    plt.rcParams['legend.fontsize'] = 10  # 设置图例字体大小
 
 # 设置日志
 logging.basicConfig(
@@ -36,6 +100,32 @@ try:
 except LookupError:
     logger.info("下载VADER词典...")
     nltk.download('vader_lexicon')
+
+# 初始化字体设置
+setup_chinese_fonts()
+
+def save_figure_with_chinese(fig, file_path, dpi=300):
+    """
+    使用正确的中文字体保存图表
+    
+    参数:
+        fig: matplotlib图表对象
+        file_path: 保存路径
+        dpi: 图像分辨率
+    """
+    # 临时更改字体设置
+    with plt.rc_context({
+        'font.family': ['sans-serif'],
+        'font.sans-serif': ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 
+                           'WenQuanYi Micro Hei', 'Heiti TC', 'Source Han Sans CN',
+                           'Noto Sans CJK SC', 'DejaVu Sans'],
+        'axes.unicode_minus': False
+    }):
+        try:
+            fig.savefig(file_path, dpi=dpi, bbox_inches='tight')
+            logger.info(f"图表已保存到 {file_path}")
+        except Exception as e:
+            logger.error(f"保存图表时出错: {str(e)}")
 
 class StockSentimentAnalyzer:
     """股票情感分析类，使用VADER模型分析金融新闻和社交媒体评论的情感。"""
@@ -474,58 +564,56 @@ class StockSentimentAnalyzer:
             
     def plot_sentiment_vs_price(self, data, ticker=None, output_dir='./plots'):
         """
-        绘制情感得分与股价的对比图。
-        
-        参数:
-            data: 包含价格和情感数据的DataFrame
-            ticker: 股票代码
-            output_dir: 图表输出目录
+        Plot sentiment scores vs stock price.
         """
         if data.empty:
-            logger.warning("没有数据可绘图")
+            logger.warning("No data to plot")
             return
             
-        # 确保输出目录存在
+        # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # 检查必要的列是否存在
+        # Check required columns
         required_columns = ['date', 'close', 'sentiment_score']
         if not all(col in data.columns for col in required_columns):
             missing = [col for col in required_columns if col not in data.columns]
-            logger.error(f"输入的DataFrame中缺少必要的列: {missing}")
+            logger.error(f"Missing required columns: {missing}")
             return
             
-        # 设置图表风格
-        plt.style.use('fivethirtyeight')
+        # Set plot style
+        plt.style.use('seaborn-v0_8-darkgrid')
+        
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
         
-        # 绘制股价图
-        ax1.plot(data['date'], data['close'], 'b-', label='收盘价')
-        ax1.set_ylabel('价格')
+        # Plot stock price
+        ax1.plot(data['date'], data['close'], 'b-', label='Close Price')
+        ax1.set_ylabel('Price', fontsize=12)
         if ticker:
-            ax1.set_title(f'{ticker} 股价与情感得分对比')
+            ax1.set_title(f'{ticker} Price vs Sentiment', fontsize=14, pad=20)
         else:
-            ax1.set_title('股价与情感得分对比')
-        ax1.legend(loc='upper left')
-        ax1.grid(True)
+            ax1.set_title('Price vs Sentiment', fontsize=14, pad=20)
+        ax1.legend(loc='upper left', fontsize=10)
+        ax1.grid(True, alpha=0.3)
+        ax1.tick_params(labelsize=10)
         
-        # 绘制情感得分图，用颜色表示正负
+        # Plot sentiment scores
         sentiment = data['sentiment_score']
         colors = ['red' if score < 0 else 'green' for score in sentiment]
-        ax2.bar(data['date'], sentiment, color=colors, alpha=0.7, label='情感得分')
+        ax2.bar(data['date'], sentiment, color=colors, alpha=0.7, label='Sentiment Score')
         ax2.axhline(y=0, color='gray', linestyle='-', alpha=0.3)
-        ax2.set_ylabel('情感得分')
-        ax2.set_xlabel('日期')
-        ax2.legend(loc='upper left')
-        ax2.grid(True)
+        ax2.set_ylabel('Sentiment Score', fontsize=12)
+        ax2.set_xlabel('Date', fontsize=12)
+        ax2.legend(loc='upper left', fontsize=10)
+        ax2.grid(True, alpha=0.3)
+        ax2.tick_params(labelsize=10)
         
-        # 设置x轴日期格式
+        # Format x-axis dates
         fig.autofmt_xdate()
         
-        # 调整子图之间的间距
+        # Adjust subplot spacing
         plt.tight_layout()
         
-        # 保存图表
+        # Save figure
         if ticker:
             file_name = f"{ticker}_sentiment_vs_price.png"
         else:
@@ -533,91 +621,93 @@ class StockSentimentAnalyzer:
         file_path = os.path.join(output_dir, file_name)
         
         try:
-            plt.savefig(file_path)
-            logger.info(f"图表已保存到 {file_path}")
+            fig.savefig(file_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Figure saved to {file_path}")
         except Exception as e:
-            logger.error(f"保存图表时出错: {str(e)}")
-            
+            logger.error(f"Error saving figure: {str(e)}")
+        
         plt.close()
         
     def visualize_sentiment_metrics(self, data, ticker=None, output_dir='./plots'):
         """
-        可视化多种情感指标。
-        
-        参数:
-            data: 包含价格和情感数据的DataFrame
-            ticker: 股票代码
-            output_dir: 图表输出目录
+        Visualize various sentiment metrics.
         """
         if data.empty:
-            logger.warning("没有数据可绘图")
+            logger.warning("No data to plot")
             return
             
-        # 确保输出目录存在
+        # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # 检查必要的列是否存在
+        # Check required columns
         required_columns = ['date', 'close', 'sentiment_score']
         if not all(col in data.columns for col in required_columns):
             missing = [col for col in required_columns if col not in data.columns]
-            logger.error(f"输入的DataFrame中缺少必要的列: {missing}")
+            logger.error(f"Missing required columns: {missing}")
             return
             
-        # 计算价格变化百分比
+        # Calculate price change percentage
         data['price_change'] = data['close'].pct_change() * 100
         
-        # 设置图表风格
-        sns.set(style="whitegrid")
+        # Set plot style
+        plt.style.use('seaborn-v0_8-darkgrid')
         
-        # 创建多个子图
+        # Create multiple subplots
         fig, axes = plt.subplots(3, 1, figsize=(14, 15), sharex=True)
         
-        # 1. 价格变化与情感得分
+        # 1. Price change vs sentiment score
         ax1 = axes[0]
-        ax1.plot(data['date'], data['price_change'], 'b-', label='价格变化%')
+        ax1.plot(data['date'], data['price_change'], 'b-', label='Price Change %', linewidth=1.5)
         ax1_twin = ax1.twinx()
-        ax1_twin.plot(data['date'], data['sentiment_score'], 'r-', label='情感得分')
-        ax1.set_ylabel('价格变化%')
-        ax1_twin.set_ylabel('情感得分')
-        ax1.set_title('价格变化与情感得分')
+        ax1_twin.plot(data['date'], data['sentiment_score'], 'r-', label='Sentiment Score', linewidth=1.5)
+        ax1.set_ylabel('Price Change %', fontsize=12)
+        ax1_twin.set_ylabel('Sentiment Score', fontsize=12)
+        ax1.set_title('Price Change vs Sentiment Score', fontsize=14, pad=20)
+        ax1.tick_params(labelsize=10)
+        ax1_twin.tick_params(labelsize=10)
         
-        # 添加图例
+        # Add legend
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax1_twin.get_legend_handles_labels()
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=10)
         
-        # 2. 情感波动性
+        # 2. Sentiment volatility
         if 'sentiment_volatility' in data.columns:
             ax2 = axes[1]
-            ax2.plot(data['date'], data['sentiment_volatility'], 'g-', label='情感波动性')
-            ax2.set_ylabel('情感波动性')
-            ax2.set_title('情感波动性')
-            ax2.legend(loc='upper left')
+            ax2.plot(data['date'], data['sentiment_volatility'], 'g-', label='Sentiment Volatility', linewidth=1.5)
+            ax2.set_ylabel('Sentiment Volatility', fontsize=12)
+            ax2.set_title('Sentiment Volatility', fontsize=14, pad=20)
+            ax2.legend(loc='upper left', fontsize=10)
+            ax2.grid(True, alpha=0.3)
+            ax2.tick_params(labelsize=10)
         
-        # 3. 情感动量（变化趋势）
+        # 3. Sentiment momentum
         if 'sentiment_momentum' in data.columns:
             ax3 = axes[2]
             colors = ['red' if mom < 0 else 'green' for mom in data['sentiment_momentum']]
-            ax3.bar(data['date'], data['sentiment_momentum'], color=colors, alpha=0.7, label='情感动量')
+            ax3.bar(data['date'], data['sentiment_momentum'], color=colors, alpha=0.7, label='Sentiment Momentum')
             ax3.axhline(y=0, color='gray', linestyle='-', alpha=0.3)
-            ax3.set_ylabel('情感动量')
-            ax3.set_title('情感动量（变化趋势）')
-            ax3.legend(loc='upper left')
+            ax3.set_ylabel('Sentiment Momentum', fontsize=12)
+            ax3.set_xlabel('Date', fontsize=12)
+            ax3.set_title('Sentiment Momentum (Trend)', fontsize=14, pad=20)
+            ax3.legend(loc='upper left', fontsize=10)
+            ax3.grid(True, alpha=0.3)
+            ax3.tick_params(labelsize=10)
         
-        # 设置主标题
+        # Set main title
         if ticker:
-            plt.suptitle(f'{ticker} 股票情感指标分析', fontsize=16)
+            plt.suptitle(f'{ticker} Stock Sentiment Analysis', fontsize=16, y=0.95)
         else:
-            plt.suptitle('股票情感指标分析', fontsize=16)
+            plt.suptitle('Stock Sentiment Analysis', fontsize=16, y=0.95)
         
-        # 设置x轴日期格式
+        # Format x-axis dates
         fig.autofmt_xdate()
         
-        # 调整子图之间的间距
+        # Adjust subplot spacing
         plt.tight_layout()
         plt.subplots_adjust(top=0.92)
         
-        # 保存图表
+        # Save figure
         if ticker:
             file_name = f"{ticker}_sentiment_metrics.png"
         else:
@@ -625,10 +715,10 @@ class StockSentimentAnalyzer:
         file_path = os.path.join(output_dir, file_name)
         
         try:
-            plt.savefig(file_path)
-            logger.info(f"情感指标图表已保存到 {file_path}")
+            fig.savefig(file_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Figure saved to {file_path}")
         except Exception as e:
-            logger.error(f"保存图表时出错: {str(e)}")
+            logger.error(f"Error saving figure: {str(e)}")
             
         plt.close()
         
@@ -1077,92 +1167,91 @@ class StockSentimentAnalyzer:
         
     def plot_backtest_results(self, backtest_results, ticker=None, output_dir='./plots'):
         """
-        绘制回测结果图表。
-        
-        参数:
-            backtest_results: 回测结果字典
-            ticker: 股票代码
-            output_dir: 图表输出目录
+        Plot backtest results.
         """
         if not backtest_results or 'portfolio_values' not in backtest_results:
-            logger.warning("没有有效的回测结果可绘图")
+            logger.warning("No valid backtest results to plot")
             return
             
-        # 确保输出目录存在
+        # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # 创建投资组合价值时间序列
+        # Create portfolio value time series
         portfolio_values = backtest_results['portfolio_values']
         dates = [p['date'] for p in portfolio_values]
         values = [p['value'] for p in portfolio_values]
         prices = [p['price'] for p in portfolio_values]
         
-        # 创建交易点位
+        # Create trading points
         positions = backtest_results['positions']
         buy_dates = [p['date'] for p in positions if p['action'] == 'buy']
         buy_values = [p['portfolio_value'] for p in positions if p['action'] == 'buy']
         sell_dates = [p['date'] for p in positions if p['action'] in ['sell', 'final_sell']]
         sell_values = [p['portfolio_value'] for p in positions if p['action'] in ['sell', 'final_sell']]
         
-        # 设置图表风格
-        plt.style.use('fivethirtyeight')
+        # Set plot style
+        plt.style.use('seaborn-v0_8-darkgrid')
         
-        # 绘制投资组合价值图和基准价格对比图
+        # Plot portfolio value and benchmark price comparison
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
         
-        # 投资组合价值
-        ax1.plot(dates, values, 'b-', label='投资组合价值')
-        # 添加买入和卖出点
+        # Portfolio value
+        ax1.plot(dates, values, 'b-', label='Portfolio Value', linewidth=1.5)
+        # Add buy and sell points
         if buy_dates:
-            ax1.scatter(buy_dates, buy_values, marker='^', color='g', s=100, label='买入')
+            ax1.scatter(buy_dates, buy_values, marker='^', color='g', s=100, label='Buy')
         if sell_dates:
-            ax1.scatter(sell_dates, sell_values, marker='v', color='r', s=100, label='卖出')
+            ax1.scatter(sell_dates, sell_values, marker='v', color='r', s=100, label='Sell')
         
-        # 添加初始资金参考线
+        # Add initial capital reference line
         initial_capital = backtest_results['summary']['initial_capital']
-        ax1.axhline(y=initial_capital, color='gray', linestyle='-', alpha=0.3, label='初始资金')
+        ax1.axhline(y=initial_capital, color='gray', linestyle='-', alpha=0.3, label='Initial Capital')
         
-        ax1.set_ylabel('投资组合价值')
+        ax1.set_ylabel('Portfolio Value', fontsize=12)
         if ticker:
-            ax1.set_title(f'{ticker} 情感交易策略回测结果')
+            ax1.set_title(f'{ticker} Sentiment Strategy Backtest Results', fontsize=14, pad=20)
         else:
-            ax1.set_title('情感交易策略回测结果')
-        ax1.legend(loc='upper left')
-        ax1.grid(True)
+            ax1.set_title('Sentiment Strategy Backtest Results', fontsize=14, pad=20)
+        ax1.legend(loc='upper left', fontsize=10)
+        ax1.grid(True, alpha=0.3)
+        ax1.tick_params(labelsize=10)
         
-        # 基准价格走势
-        scaled_prices = np.array(prices) * (initial_capital / prices[0])  # 缩放价格以便比较
-        ax2.plot(dates, scaled_prices, 'g-', label='买入持有策略')
-        ax2.plot(dates, values, 'b-', label='情感交易策略')
-        ax2.set_ylabel('价值')
-        ax2.set_xlabel('日期')
-        ax2.legend(loc='upper left')
-        ax2.grid(True)
+        # Benchmark price trend
+        scaled_prices = np.array(prices) * (initial_capital / prices[0])  # Scale prices for comparison
+        ax2.plot(dates, scaled_prices, 'g-', label='Buy & Hold Strategy', linewidth=1.5)
+        ax2.plot(dates, values, 'b-', label='Sentiment Strategy', linewidth=1.5)
+        ax2.set_ylabel('Value', fontsize=12)
+        ax2.set_xlabel('Date', fontsize=12)
+        ax2.legend(loc='upper left', fontsize=10)
+        ax2.grid(True, alpha=0.3)
+        ax2.tick_params(labelsize=10)
         
-        # 添加回测结果摘要文本框
+        # Add backtest results summary text box
         summary = backtest_results['summary']
         summary_text = (
-            f"初始资金: ${summary['initial_capital']:.2f}\n"
-            f"最终价值: ${summary['final_value']:.2f}\n"
-            f"总收益率: {summary['total_return_pct']:.2f}%\n"
-            f"年化收益率: {summary['annual_return_pct']:.2f}%\n"
-            f"买入持有收益率: {summary['buy_hold_return_pct']:.2f}%\n"
-            f"最大回撤: {summary['max_drawdown_pct']:.2f}%\n"
-            f"夏普比率: {summary['sharpe_ratio']:.2f}\n"
-            f"胜率: {summary['win_rate']*100:.2f}%\n"
-            f"交易次数: {summary['total_trades']}"
+            f"Initial Capital: ${summary['initial_capital']:,.2f}\n"
+            f"Final Value: ${summary['final_value']:,.2f}\n"
+            f"Total Return: {summary['total_return_pct']:.2f}%\n"
+            f"Annual Return: {summary['annual_return_pct']:.2f}%\n"
+            f"Buy & Hold Return: {summary['buy_hold_return_pct']:.2f}%\n"
+            f"Max Drawdown: {summary['max_drawdown_pct']:.2f}%\n"
+            f"Sharpe Ratio: {summary['sharpe_ratio']:.2f}\n"
+            f"Win Rate: {summary['win_rate']*100:.2f}%\n"
+            f"Total Trades: {summary['total_trades']}"
         )
         
-        fig.text(0.15, 0.02, summary_text, bbox=dict(facecolor='white', alpha=0.8), fontsize=10)
+        # Use better text box style
+        props = dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray')
+        fig.text(0.15, 0.02, summary_text, bbox=props, fontsize=10, fontfamily='sans-serif')
         
-        # 设置x轴日期格式
+        # Format x-axis dates
         fig.autofmt_xdate()
         
-        # 调整子图之间的间距
+        # Adjust subplot spacing
         plt.tight_layout()
         plt.subplots_adjust(bottom=0.20)
         
-        # 保存图表
+        # Save figure
         if ticker:
             file_name = f"{ticker}_backtest_results.png"
         else:
@@ -1170,25 +1259,43 @@ class StockSentimentAnalyzer:
         file_path = os.path.join(output_dir, file_name)
         
         try:
-            plt.savefig(file_path)
-            logger.info(f"回测结果图表已保存到 {file_path}")
+            fig.savefig(file_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Figure saved to {file_path}")
         except Exception as e:
-            logger.error(f"保存图表时出错: {str(e)}")
+            logger.error(f"Error saving figure: {str(e)}")
             
         plt.close()
 
 def find_latest_news_file(ticker, news_dir='./data/news'):
-    """查找指定ticker的最新新闻文件。"""
+    """
+    查找指定ticker的最新新闻文件。
+    
+    参数:
+        ticker: 股票代码
+        news_dir: 新闻文件目录路径
+    返回:
+        最新新闻文件的完整路径，如果未找到则返回None
+    """
+    # 确保news_dir是绝对路径
+    news_dir = os.path.abspath(news_dir)
+    
+    # 确保目录存在
+    os.makedirs(news_dir, exist_ok=True)
+    
+    # 构建搜索模式
     search_pattern = os.path.join(news_dir, f"{ticker}_news_*.csv")
     files = glob.glob(search_pattern)
     
     if not files:
+        logger.error(f"未找到 {ticker} 的新闻文件，搜索路径: {search_pattern}")
         return None
         
     # 解析文件名中的日期并找到最新的文件
     latest_file = None
     latest_date = None
-    date_pattern = re.compile(r'_news_(\d{8}).csv$') # Matches YYYYMMDD
+    
+    # 修改日期模式以匹配新的文件名格式
+    date_pattern = re.compile(r'_to_(\d{8}).csv$')  # 匹配文件名中的结束日期
     
     for f in files:
         match = date_pattern.search(os.path.basename(f))
@@ -1200,8 +1307,13 @@ def find_latest_news_file(ticker, news_dir='./data/news'):
                     latest_date = current_date
                     latest_file = f
             except ValueError:
-                continue # Skip files with invalid date format
+                continue # 跳过日期格式无效的文件
                 
+    if latest_file:
+        logger.info(f"找到最新的新闻文件: {latest_file}")
+    else:
+        logger.warning(f"未能从找到的文件中解析出有效的日期")
+        
     return latest_file
 
 def main(ticker=None, news_file=None, price_file=None, start_date=None, end_date=None, backtest=True, predefined=False):
@@ -1223,11 +1335,22 @@ def main(ticker=None, news_file=None, price_file=None, start_date=None, end_date
     tickers_to_process = []
     run_default = False
     
+    # 获取当前工作目录
+    current_dir = os.getcwd()
+    
+    # 设置数据目录路径
+    data_dir = os.path.join(current_dir, 'data')
+    news_dir = os.path.join(data_dir, 'news')
+    
+    # 确保数据目录存在
+    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(news_dir, exist_ok=True)
+    
     if ticker and not predefined:
         tickers_to_process = [ticker]
         logger.info(f"指定处理单个股票: {ticker}")
     else:
-        # 使用预定义的股票列表（与process_stock_data.py相同）
+        # 使用预定义的股票列表
         tickers_to_process = [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA',       # 科技
             'JPM', 'BAC', 'C', 'WFC', 'GS',                # 金融
@@ -1249,31 +1372,41 @@ def main(ticker=None, news_file=None, price_file=None, start_date=None, end_date
         
         if run_default or not current_news_file:
             # 自动查找最新的新闻文件
-            found_news_file = find_latest_news_file(current_ticker)
+            found_news_file = find_latest_news_file(current_ticker, news_dir=news_dir)
             if found_news_file:
                 current_news_file = found_news_file
                 logger.info(f"找到最新的新闻文件: {current_news_file}")
             else:
                 logger.warning(f"未找到 {current_ticker} 的新闻文件，跳过此股票。")
-                continue # 跳到下一个ticker
+                continue
                 
         if run_default or not current_price_file:
-            # 使用默认的价格文件路径
-            default_price_path = f"./data/{current_ticker}.csv"
-            if os.path.exists(default_price_path):
-                current_price_file = default_price_path
-                logger.info(f"使用默认价格文件: {current_price_file}")
-            else:
-                logger.warning(f"未找到 {current_ticker} 的价格文件 ({default_price_path})，跳过此股票。")
-                continue # 跳到下一个ticker
+            # 尝试多个可能的价格文件路径
+            possible_price_paths = [
+                os.path.join(data_dir, f"{current_ticker}.csv"),  # 标准路径
+                os.path.join(current_dir, f"{current_ticker}.csv"),  # 当前目录
+                os.path.join(current_dir, "data", f"{current_ticker}.csv"),  # 相对于当前目录的data文件夹
+                os.path.join(os.path.dirname(current_dir), "data", f"{current_ticker}.csv")  # 上级目录的data文件夹
+            ]
+            
+            current_price_file = None
+            for path in possible_price_paths:
+                if os.path.exists(path):
+                    current_price_file = path
+                    logger.info(f"找到价格文件: {current_price_file}")
+                    break
+                    
+            if not current_price_file:
+                logger.warning(f"未找到 {current_ticker} 的价格文件，尝试过以下路径: {possible_price_paths}")
+                continue
 
-        # --- 执行核心分析流程 (与之前类似，但使用current_ticker, current_news_file, current_price_file) ---
+        # --- 执行核心分析流程 ---
         logger.info(f"为 {current_ticker} 执行情感分析...")
         
         # --- 1. 参数设置和初始化 ---
-        analyzer = StockSentimentAnalyzer()
+        analyzer = StockSentimentAnalyzer(data_dir=os.path.join(current_dir, 'data', 'sentiment'))
         output_dir = analyzer.data_dir
-        plot_dir = './plots'
+        plot_dir = os.path.join(current_dir, 'plots')
         os.makedirs(plot_dir, exist_ok=True)
         
         # 检查文件是否存在 (虽然上面已检查，双重保险)
