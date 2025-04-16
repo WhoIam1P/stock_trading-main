@@ -1,6 +1,7 @@
-# 股票情感分析模型(VADER)
+# 股票预测情感舆情分析系统
+# 特朗普行为预测系统
 
-这是一个使用VADER(Valence Aware Dictionary and sEntiment Reasoner)模型进行股票情感分析的工具。VADER是一个专为社交媒体和金融文本设计的情感分析工具，可以有效分析股票相关新闻和评论的情感倾向。
+这是一个使用VADER(Valence Aware Dictionary and sEntiment Reasoner)模型进行股票情感分析的工具。VADER是一个专为社交媒体和金融文本设计的情感分析工具，可以有效分析股票相关新闻和评论的情感倾向，并根据股票预测正确率反向推导特朗普行为预测
 
 ## 功能特点
 
